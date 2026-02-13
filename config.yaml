@@ -1,0 +1,19 @@
+provider: gemini
+model: gemini-2.5-flash
+approval_mode: normal
+max_steps: 20
+max_retries: 1
+step_timeout_seconds: 30
+shell:
+  allowed_commands:
+    - dir
+    - ls
+    - type
+    - cat
+    - echo
+    - python
+    - pytest
+    - git
+web:
+  provider: auto
+  max_results: 5

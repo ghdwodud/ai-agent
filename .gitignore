@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+
+agent_run.jsonl
+
+__pycache__/
+*.pyc
+.pytest_cache/
+
