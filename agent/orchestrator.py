@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Callable, Optional, Protocol
 
 from agent.policy import PolicyEngine
 from agent.session import SessionState
@@ -13,6 +13,7 @@ from tools.shell_tool import ShellTool
 from tools.web_tool import WebTool
 
 ApproveFn = Callable[[str], str]
+StructuredApproveFn = Callable[[str, str, dict, str], str]
 
 
 class Decider(Protocol):
@@ -47,7 +48,13 @@ class Orchestrator:
         self.logger = logger
         self.always_deny_tools: set[str] = set()
 
-    def run(self, session: SessionState, cfg: RunConfig, input_fn: ApproveFn = input) -> str:
+    def run(
+        self,
+        session: SessionState,
+        cfg: RunConfig,
+        input_fn: ApproveFn = input,
+        structured_approve_fn: Optional[StructuredApproveFn] = None,
+    ) -> str:
         session.add_message("user", session.goal)
         for step in range(1, cfg.max_steps + 1):
             decision, model_metrics = self.model_client.decide(
@@ -82,7 +89,14 @@ class Orchestrator:
             if policy_decision.status == PolicyStatus.DENY:
                 continue
 
-            if not self._approve(proposal.tool_name, proposal.reason, proposal.args, input_fn):
+            if not self._approve(
+                proposal.tool_name,
+                proposal.reason,
+                proposal.args,
+                "primary",
+                input_fn,
+                structured_approve_fn,
+            ):
                 session.add_event("approval_denied", {"tool": proposal.tool_name})
                 self._json_log(cfg.log_path, {"step": step, "type": "approval_denied", "tool": proposal.tool_name})
                 continue
@@ -96,7 +110,9 @@ class Orchestrator:
                     proposal.tool_name,
                     "Extra confirmation required for high-risk/strict mode.",
                     proposal.args,
+                    "extra",
                     input_fn,
+                    structured_approve_fn,
                 ):
                     session.add_event("approval_denied_extra", {"tool": proposal.tool_name})
                     self._json_log(
@@ -142,7 +158,15 @@ class Orchestrator:
             self.logger.exception("Tool execution failed")
             return ActionResult(ok=False, error_type="exception", stderr=str(exc))
 
-    def _approve(self, tool_name: str, reason: str, args: dict, input_fn: ApproveFn) -> bool:
+    def _approve(
+        self,
+        tool_name: str,
+        reason: str,
+        args: dict,
+        stage: str,
+        input_fn: ApproveFn,
+        structured_fn: Optional[StructuredApproveFn] = None,
+    ) -> bool:
         prompt = (
             f"\nProposed action\n"
             f"- tool: {tool_name}\n"
@@ -150,7 +174,10 @@ class Orchestrator:
             f"- args: {json.dumps(args, ensure_ascii=True)}\n"
             "Approve? [y]es / [n]o / [ad] always deny this tool: "
         )
-        ans = input_fn(prompt).strip().lower()
+        if structured_fn is not None:
+            ans = structured_fn(tool_name, reason, args, stage).strip().lower()
+        else:
+            ans = input_fn(prompt).strip().lower()
         if ans == "ad":
             self.always_deny_tools.add(tool_name)
             return False

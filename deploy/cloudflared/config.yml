@@ -1,0 +1,7 @@
+tunnel: 8e4a5783-67e9-458f-977f-f3e058213e41
+credentials-file: C:\Users\ecco2\.cloudflared\8e4a5783-67e9-458f-977f-f3e058213e41.json
+
+ingress:
+  - hostname: api.stockgame.cc
+    service: http://127.0.0.1:8000
+  - service: http_status:404

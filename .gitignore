@@ -3,8 +3,8 @@
 !.env.example
 
 agent_run.jsonl
+agent_run_*.jsonl
 
 __pycache__/
 *.pyc
 .pytest_cache/
-
