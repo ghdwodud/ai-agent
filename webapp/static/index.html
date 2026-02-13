@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Remote Agent Console</title>
+  <title>원격 승인 패널</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -13,93 +13,64 @@
   <div class="bg-glow"></div>
   <main class="container">
     <header class="hero">
-      <p class="kicker">Remote Control</p>
-      <h1>Agent Approval Console</h1>
-      <p class="sub">Start runs, watch status, and approve actions from anywhere.</p>
+      <p class="kicker">간단 모드</p>
+      <h1>원격 승인 패널</h1>
+      <p class="sub">요청을 시작하고, 뜨는 승인 건만 처리하면 됩니다.</p>
     </header>
 
     <section class="card">
-      <h2>Connection</h2>
-      <div class="grid two">
+      <h2>기본 입력</h2>
+      <div class="grid">
         <label>
-          API Base URL
+          API 기본 주소
           <input id="baseUrl" type="text" value="" placeholder="https://api.stockgame.cc">
         </label>
         <label>
-          Bearer Token
-          <input id="token" type="password" placeholder="AGENT_WEB_TOKEN">
-        </label>
-      </div>
-      <div class="actions">
-        <button id="saveConn" class="btn accent">Save</button>
-        <span id="connMsg" class="muted"></span>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Start Run</h2>
-      <div class="grid two">
-        <label>
-          Goal
-          <input id="goal" type="text" value="List files in current directory and write one-line summary">
+          목표
+          <input id="goal" type="text" value="현재 디렉터리 파일 목록을 확인하고 한 줄 요약 작성">
         </label>
         <label>
-          CWD
-          <input id="cwd" type="text" value=".">
-        </label>
-        <label>
-          Provider
+          모델 공급자
           <select id="provider">
             <option value="gemini">gemini</option>
             <option value="openai">openai</option>
             <option value="anthropic">anthropic</option>
           </select>
         </label>
-        <label>
-          Max Steps
-          <input id="maxSteps" type="number" min="1" max="100" value="6">
-        </label>
       </div>
       <div class="actions">
-        <button id="startRun" class="btn accent">Start Run</button>
+        <button id="startRun" class="btn accent">요청 시작</button>
+        <button id="togglePoll" class="btn">자동 새로고침 시작</button>
         <span id="runMsg" class="muted"></span>
       </div>
     </section>
 
     <section class="card">
-      <h2>Run Monitor</h2>
-      <div class="row">
-        <label class="grow">
-          Run ID
-          <input id="runId" type="text" placeholder="Paste run_id or start a run">
-        </label>
-        <button id="loadRun" class="btn">Load</button>
-        <button id="togglePoll" class="btn">Start Poll</button>
-      </div>
+      <h2>현재 실행 상태</h2>
       <div class="status-grid">
-        <div><span class="muted">Status</span><strong id="status">-</strong></div>
-        <div><span class="muted">Events</span><strong id="eventCount">-</strong></div>
+        <div><span class="muted">상태</span><strong id="status">-</strong></div>
+        <div><span class="muted">run_id</span><strong id="runIdText">-</strong></div>
+        <div><span class="muted">이벤트 수</span><strong id="eventCount">-</strong></div>
       </div>
-      <pre id="finalText" class="final">Final output will appear here.</pre>
+      <pre id="finalText" class="final">최종 결과가 여기에 표시됩니다.</pre>
     </section>
 
     <section class="card warn" id="approvalCard">
-      <h2>Pending Approval</h2>
-      <div id="pendingBox">No pending approval.</div>
+      <h2>승인 대기</h2>
+      <div id="pendingBox">현재 승인 대기 요청이 없습니다.</div>
       <div class="actions">
-        <button data-decision="y" class="btn accent approveBtn">Approve (y)</button>
-        <button data-decision="n" class="btn reject approveBtn">Reject (n)</button>
-        <button data-decision="ad" class="btn deny approveBtn">Always Deny Tool (ad)</button>
+        <button data-decision="y" class="btn accent approveBtn">승인 (y)</button>
+        <button data-decision="n" class="btn reject approveBtn">거절 (n)</button>
+        <button data-decision="ad" class="btn deny approveBtn">이 도구 항상 거절 (ad)</button>
       </div>
     </section>
 
     <section class="card">
-      <h2>Events</h2>
+      <h2>이벤트 로그</h2>
       <pre id="events" class="events">[]</pre>
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>
-

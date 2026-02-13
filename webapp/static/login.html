@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로그인</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="container" style="max-width:560px;">
+    <header class="hero">
+      <p class="kicker">로그인</p>
+      <h1>원격 승인 패널</h1>
+      <p class="sub">관리자 계정으로 로그인하세요.</p>
+    </header>
+
+    <section class="card">
+      <div class="grid">
+        <label>
+          아이디
+          <input id="username" type="text" autocomplete="username">
+        </label>
+        <label>
+          비밀번호
+          <input id="password" type="password" autocomplete="current-password">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="loginBtn" class="btn accent">로그인</button>
+        <span id="msg" class="muted"></span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const btn = document.getElementById("loginBtn");
+    const msg = document.getElementById("msg");
+    const username = document.getElementById("username");
+    const password = document.getElementById("password");
+    async function login() {
+      msg.textContent = "";
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            username: username.value.trim(),
+            password: password.value,
+          }),
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t);
+        }
+        location.href = "/";
+      } catch (e) {
+        msg.textContent = "로그인 실패: 아이디/비밀번호를 확인하세요.";
+        msg.style.color = "#b24c2d";
+      }
+    }
+    btn.addEventListener("click", login);
+    password.addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+  </script>
+</body>
+</html>
+

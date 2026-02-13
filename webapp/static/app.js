@@ -1,16 +1,10 @@
 const els = {
   baseUrl: document.getElementById("baseUrl"),
-  token: document.getElementById("token"),
-  saveConn: document.getElementById("saveConn"),
-  connMsg: document.getElementById("connMsg"),
   goal: document.getElementById("goal"),
-  cwd: document.getElementById("cwd"),
   provider: document.getElementById("provider"),
-  maxSteps: document.getElementById("maxSteps"),
   startRun: document.getElementById("startRun"),
   runMsg: document.getElementById("runMsg"),
-  runId: document.getElementById("runId"),
-  loadRun: document.getElementById("loadRun"),
+  runIdText: document.getElementById("runIdText"),
   togglePoll: document.getElementById("togglePoll"),
   status: document.getElementById("status"),
   eventCount: document.getElementById("eventCount"),
@@ -21,6 +15,7 @@ const els = {
 
 let pollTimer = null;
 let currentPending = null;
+let currentRunId = "";
 
 function getStored(key, fallback = "") {
   const v = localStorage.getItem(key);
@@ -31,26 +26,26 @@ function setStored(key, value) {
   localStorage.setItem(key, value);
 }
 
-function config() {
+function cfg() {
   return {
     baseUrl: (els.baseUrl.value || "").trim().replace(/\/+$/, ""),
-    token: (els.token.value || "").trim(),
   };
 }
 
 async function api(path, options = {}) {
-  const { baseUrl, token } = config();
-  if (!baseUrl || !token) {
-    throw new Error("Base URL and Bearer token are required.");
+  const { baseUrl } = cfg();
+  if (!baseUrl) {
+    throw new Error("API 주소를 입력하세요.");
   }
-  const headers = Object.assign(
-    {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    options.headers || {}
-  );
-  const res = await fetch(`${baseUrl}${path}`, { ...options, headers });
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  const res = await fetch(`${baseUrl}${path}`, { ...options, headers, credentials: "include" });
+  if (res.status === 401) {
+    location.href = "/login";
+    throw new Error("로그인이 필요합니다.");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${text}`);
@@ -58,98 +53,93 @@ async function api(path, options = {}) {
   return res.json();
 }
 
-function setMsg(el, text, bad = false) {
-  el.textContent = text;
-  el.style.color = bad ? "#b24c2d" : "#1f7a5a";
+function setMsg(text, isError = false) {
+  els.runMsg.textContent = text;
+  els.runMsg.style.color = isError ? "#b24c2d" : "#1f7a5a";
+}
+
+function saveConn() {
+  const { baseUrl } = cfg();
+  setStored("agent_base_url", baseUrl);
 }
 
 async function startRun() {
   try {
+    saveConn();
     const payload = {
       goal: els.goal.value.trim(),
-      cwd: els.cwd.value.trim() || ".",
+      cwd: ".",
       provider: els.provider.value,
-      max_steps: Number(els.maxSteps.value || "6"),
+      max_steps: 8,
     };
     const data = await api("/runs", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    els.runId.value = data.run_id;
-    setMsg(els.runMsg, `Run started: ${data.run_id}`);
+    currentRunId = data.run_id;
+    setStored("last_run_id", currentRunId);
+    setMsg(`요청 시작됨: ${currentRunId}`);
     await loadRun();
     startPolling();
   } catch (err) {
-    setMsg(els.runMsg, String(err.message || err), true);
+    setMsg(String(err.message || err), true);
   }
 }
 
 async function loadRun() {
-  const runId = (els.runId.value || "").trim();
-  if (!runId) {
-    setMsg(els.runMsg, "run_id is required.", true);
-    return;
-  }
+  const runId = currentRunId || getStored("last_run_id", "");
+  if (!runId) return;
+  currentRunId = runId;
   try {
     const [snap, events] = await Promise.all([
       api(`/runs/${runId}`),
       api(`/runs/${runId}/events`),
     ]);
-    renderSnapshot(snap);
-    renderEvents(events.items || []);
+    els.status.textContent = snap.status || "-";
+    els.runIdText.textContent = runId;
+    els.eventCount.textContent = String(snap.event_count ?? "-");
+    els.finalText.textContent = snap.final_text || "아직 최종 결과가 없습니다.";
+    currentPending = snap.pending || null;
+    els.pendingBox.textContent = currentPending
+      ? JSON.stringify(currentPending, null, 2)
+      : "현재 승인 대기 요청이 없습니다.";
+    els.events.textContent = JSON.stringify(events.items || [], null, 2);
   } catch (err) {
-    setMsg(els.runMsg, String(err.message || err), true);
+    setMsg(String(err.message || err), true);
   }
-}
-
-function renderSnapshot(snap) {
-  els.status.textContent = snap.status || "-";
-  els.eventCount.textContent = String(snap.event_count ?? "-");
-  els.finalText.textContent = snap.final_text || "No final output yet.";
-  currentPending = snap.pending || null;
-  if (currentPending) {
-    els.pendingBox.textContent = JSON.stringify(currentPending, null, 2);
-  } else {
-    els.pendingBox.textContent = "No pending approval.";
-  }
-}
-
-function renderEvents(items) {
-  els.events.textContent = JSON.stringify(items, null, 2);
 }
 
 async function sendApproval(decision) {
   if (!currentPending) {
-    setMsg(els.runMsg, "No pending approval.", true);
+    setMsg("승인 대기 요청이 없습니다.", true);
     return;
   }
-  const runId = (els.runId.value || "").trim();
   try {
-    await api(`/runs/${runId}/approve`, {
+    await api(`/runs/${currentRunId}/approve`, {
       method: "POST",
       body: JSON.stringify({
         request_id: currentPending.request_id,
         decision,
       }),
     });
-    setMsg(els.runMsg, `Approval sent: ${decision}`);
+    setMsg(`승인 응답 전송: ${decision}`);
     await loadRun();
   } catch (err) {
-    setMsg(els.runMsg, String(err.message || err), true);
+    setMsg(String(err.message || err), true);
   }
 }
 
 function startPolling() {
   if (pollTimer) return;
   pollTimer = setInterval(loadRun, 1500);
-  els.togglePoll.textContent = "Stop Poll";
+  els.togglePoll.textContent = "자동 새로고침 중지";
 }
 
 function stopPolling() {
   if (!pollTimer) return;
   clearInterval(pollTimer);
   pollTimer = null;
-  els.togglePoll.textContent = "Start Poll";
+  els.togglePoll.textContent = "자동 새로고침 시작";
 }
 
 function togglePolling() {
@@ -157,24 +147,20 @@ function togglePolling() {
   else startPolling();
 }
 
-function saveConnection() {
-  const { baseUrl, token } = config();
-  setStored("agent_base_url", baseUrl);
-  setStored("agent_token", token);
-  setMsg(els.connMsg, "Saved.");
-}
-
 function init() {
   els.baseUrl.value = getStored("agent_base_url", `${location.protocol}//${location.host}`);
-  els.token.value = getStored("agent_token", "");
-  els.saveConn.addEventListener("click", saveConnection);
+  currentRunId = getStored("last_run_id", "");
+
+  els.baseUrl.addEventListener("change", saveConn);
   els.startRun.addEventListener("click", startRun);
-  els.loadRun.addEventListener("click", loadRun);
   els.togglePoll.addEventListener("click", togglePolling);
   document.querySelectorAll(".approveBtn").forEach((btn) => {
     btn.addEventListener("click", () => sendApproval(btn.dataset.decision));
   });
+
+  if (currentRunId) {
+    loadRun();
+  }
 }
 
 init();
-
